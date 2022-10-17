@@ -1,0 +1,17 @@
+.ttv-handlebars {
+  @apply w-full flex flex-col gap-2;
+  textarea,
+  select,
+  pre {
+    @apply box-border w-full p-2 border border-solid border-gray-200 rounded;
+  }
+  textarea {
+    min-height: 10rem;
+  }
+  .ttv-handlebars__data {
+    pre {
+      @apply border border-solid border-gray-200 overflow-auto;
+      min-height: 10rem;
+    }
+  }
+}

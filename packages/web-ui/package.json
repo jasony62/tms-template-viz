@@ -1,0 +1,44 @@
+{
+  "name": "tms-template-viz",
+  "version": "0.0.1",
+  "description": "生成模板文档的可视化工具包，支持：handlebars模板。",
+  "type": "module",
+  "files": [
+    "dist"
+  ],
+  "main": "./dist/tms-template-viz.umd.cjs",
+  "module": "./dist/tms-template-viz.js",
+  "exports": {
+    ".": {
+      "import": "./dist/tms-template-viz.js",
+      "require": "./dist/tms-template-viz.umd.cjs"
+    },
+    "./dist/*": "./dist/*"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "rimraf ./dist && vite build",
+    "test": "jest",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "handlebars": "^4.7.7",
+    "tms-template-wizard": "workspace:*",
+    "vue": "^3.2.37"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.1.2",
+    "@types/node": "^18.8.4",
+    "@vitejs/plugin-vue": "^3.1.0",
+    "autoprefixer": "^10.4.12",
+    "jest": "^29.1.2",
+    "postcss": "^8.4.18",
+    "rimraf": "^3.0.2",
+    "sass": "^1.55.0",
+    "tailwindcss": "^3.1.8",
+    "ts-jest": "^29.0.3",
+    "typescript": "^4.6.4",
+    "vite": "^3.1.0",
+    "vue-tsc": "^1.0.5"
+  }
+}
