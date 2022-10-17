@@ -4,6 +4,7 @@ import { HandlebarsWizard } from 'tms-template-wizard'
 import './HandlebarsViz.scss'
 
 const { Wizard, CONVERT_MODE } = HandlebarsWizard
+
 const props = defineProps({
   templateText: { type: String }
 })
@@ -14,7 +15,7 @@ const sample = ref('')
 const template = ref('')
 const output = ref('')
 
-let wizard: Wizard
+let wizard: InstanceType<typeof Wizard>
 
 if (props.templateText) {
   wizard = Wizard.Builder().setTemplate(props.templateText).build()
