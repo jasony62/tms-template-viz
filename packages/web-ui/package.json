@@ -1,6 +1,6 @@
 {
   "name": "tms-template-viz",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "生成模板文档的可视化工具包，支持：handlebars模板。",
   "type": "module",
   "files": [
