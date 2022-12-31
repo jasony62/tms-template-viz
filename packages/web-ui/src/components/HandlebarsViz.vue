@@ -1,100 +1,245 @@
-<script setup lang="ts">
-import { ref } from 'vue';
-import { HandlebarsWizard } from 'tms-template-wizard'
-import './HandlebarsViz.scss'
-
-const { Wizard, CONVERT_MODE } = HandlebarsWizard
-
-const props = defineProps({
-  templateText: { type: String }
-})
-
-const mode = ref('')
-const target = ref('')
-const sample = ref('')
-const template = ref('')
-const output = ref('')
-
-let wizard: InstanceType<typeof Wizard>
-
-if (props.templateText) {
-  wizard = Wizard.Builder().setTemplate(props.templateText).build()
-  target.value = typeof wizard.target !== 'string' ? JSON.stringify(wizard.target, null, 2) : wizard.target
-  mode.value = wizard.mode
-  template.value = props.templateText
-}
-
-const generate = () => {
-  let targetJson = mode.value === CONVERT_MODE.Text ? target.value : JSON.parse(target.value)
-  let builder = Wizard.Builder(targetJson)
-  let sampleJson
-  if (sample.value) {
-    sampleJson = JSON.parse(sample.value)
-    builder.setInputSample(sampleJson)
-  }
-  switch (mode.value) {
-    case 'fill':
-      builder.setMode(CONVERT_MODE.Fill)
-      break
-    case 'list':
-      builder.setMode(CONVERT_MODE.List)
-      break
-  }
-  wizard = builder.build()
-  template.value = wizard.template()
-}
-
-const test = (event: MouseEvent) => {
-  if (!wizard) generate()
-
-  if (sample.value) {
-    let sampleJson = JSON.parse(sample.value)
-    let outputResult = wizard.outputResult(sampleJson)
-    output.value = wizard.mode === CONVERT_MODE.Text ? outputResult : JSON.stringify(outputResult)
-  }
-}
-
-</script>
-
 <template>
-  <div class="ttv-handlebars">
-    <div class="ttv-handlebars__mode">
+  <div class="ttv-wizard">
+    <div class="ttv-wizard__mode">
       <select v-model="mode">
-        <option value=""></option>
-        <option value="text_fill">字符串填充</option>
-        <option value="fill">对象或数组填充</option>
-        <option value="list">转换列表</option>
+        <option value="text">插入单个变量</option>
+        <option value="list1">插入循环结构</option>
+        <option value="list2">插入循环结构（子模板）</option>
       </select>
     </div>
-    <div class="ttv-handlebars__target">
-      <div>目标数据结构</div>
-      <div class="target">
-        <textarea v-model="target"></textarea>
-      </div>
+    <div>
+      <select v-model="templateDataType">
+        <option value="text">文本</option>
+        <option value="json:array">JSON数组</option>
+      </select>
     </div>
-    <div class="ttv-handlebars__sample">
-      <div>输入数据样例</div>
+    <div class="ttv-wizard__vars">
+      <select v-model="selectedVar">
+        <option :value="null">选择变量</option>
+        <option v-for="v in vars" :value="v">{{ v.title }}</option>
+      </select>
+    </div>
+    <div class="ttv-wizard__sub-template"
+      v-if="[TEMPLATE_SNIPPET_MODE.List1, TEMPLATE_SNIPPET_MODE.List2].includes(mode)">
+      <div>子模板</div>
+      <div v-if="subVars.length">
+        <select v-model="selectedSubVar">
+          <option value="">选择变量</option>
+          <option v-for="v in subVars" :value="v">{{ v }}</option>
+        </select>
+      </div>
+      <div class="ttv-wizard__actions">
+        <button @click="insertSubSnippet">插入变量</button>
+      </div>
+      <div ref="elSubTemplate" class="ttv-wizard__editor" contenteditable="true"></div>
+    </div>
+    <div class="ttv-wizard__template">
+      <div>模板</div>
+      <div class="ttv-wizard__actions">
+        <button @click="insertSnippet" class="tvu-button">插入模板片段</button>
+        <button @click="replaceTemplate" class="tvu-button">替换模板</button>
+      </div>
+      <div ref="elTemplate" class="ttv-wizard__editor" contenteditable="true"></div>
+    </div>
+    <div class="ttv-wizard__sample">
+      <div>模板变量数据样例</div>
+      <div class="ttv-wizard__actions">
+        <button @click="createSampleMold" class="tvu-button">生成测试数据框架</button>
+      </div>
       <div class="sample">
         <textarea v-model="sample"></textarea>
       </div>
     </div>
-    <div class="ttv-handlebars--actions">
-      <button @click="generate" class="tvu-button">生成模板</button>
-    </div>
-    <div class="ttv-handlebars__template">
-      <div>handlebars模板</div>
-      <div class="resul">
-        <textarea v-model="template"></textarea>
-      </div>
-    </div>
-    <div class="ttv-handlebars__actions">
-      <button @click="test" class="tvu-button">测试</button>
-    </div>
-    <div class="ttv-handlebars__data">
+    <div class="ttv-wizard__output">
       <div>测试结果</div>
-      <div>
-        <pre>{{output}}</pre>
+      <div class="ttv-wizard__actions">
+        <button @click="test" class="tvu-button">测试</button>
+      </div>
+      <div class="ttv-wizard__output__wrap">
+        <pre>{{ output }}</pre>
       </div>
     </div>
   </div>
 </template>
+
+<script setup lang="ts">
+import { computed, onMounted, ref, watch } from 'vue'
+import { Wizard, TEMPLATE_SNIPPET_MODE, TEMPLATE_DATA_TYPE } from 'tms-template-wizard'
+import type { TemplateVar, WizardCreateOption } from 'tms-template-wizard'
+import './HandlebarsViz.scss'
+import _get from 'lodash.get'
+
+const props = defineProps({
+  varsRootName: { type: String, required: true },
+  templateText: { type: String },
+  vars: { type: Array<TemplateVar> },
+})
+
+const selectedVar = ref<any>(null)
+const templateDataType = ref(TEMPLATE_DATA_TYPE.Text)
+const selectedSubVar = ref<string>('')
+const mode = ref(TEMPLATE_SNIPPET_MODE.Text)
+const sample = ref('')
+const output = ref('')
+
+const elTemplate = ref<HTMLDivElement | null>(null)
+const elSubTemplate = ref<HTMLDivElement | null>(null)
+
+let wizard: InstanceType<typeof Wizard>
+
+onMounted(() => {
+  if (elTemplate.value) {
+    if (props.templateText) elTemplate.value.innerText = props.templateText
+    const { varsRootName, vars } = props
+    wizard = Wizard.Create({ varsRootName, vars } as WizardCreateOption)
+  }
+})
+
+watch(templateDataType, (nv) => {
+  if (wizard)
+    wizard.templateDataType = nv
+}, { immediate: true })
+
+const subVars = computed(() => {
+  const example = selectedVar.value?.example
+  if (!example) return []
+  if (Array.isArray(example)) {
+    if (example.length === 0) return []
+  } else if (typeof example === 'object') {
+    if (Object.keys(example).length === 0) return []
+  } else return []
+
+  function walk(o: any, parentPath: string, result: string[]) {
+    for (let k in o) {
+      let v = o[k]
+      if (Array.isArray(v)) {
+        walk(v, parentPath + `[${k}]`, result)
+      } else if (v && typeof v === 'object') {
+        walk(v, parentPath + '.' + k, result)
+      } else {
+        result.push(parentPath ? `.${k}` : k)
+      }
+    }
+  }
+
+  const result: string[] = []
+  walk(Array.isArray(example) ? example[0] : example, '', result)
+
+  return result
+})
+/**
+ * 创建模板片段
+ */
+const createSnippet = () => {
+  if (!selectedVar.value) return ''
+
+  const { name } = selectedVar.value
+  let subTpl = elSubTemplate.value?.innerText ?? '替换这里的内容'
+  let snippet = wizard.createSnippet(name, subTpl, mode.value)
+
+  return snippet
+}
+
+const insertSnippet = () => {
+  let insertContent = createSnippet()
+
+  let selObj = window.getSelection()
+  /**
+   * 模板编辑框是否有选中的区域
+   */
+  let isVarsTplEditor = false
+  let pe = selObj?.anchorNode?.parentElement
+  while (pe) {
+    if (pe.classList.contains('ttv-wizard__template')) {
+      isVarsTplEditor = true
+      break
+    }
+    pe = pe.parentElement
+  }
+  if (isVarsTplEditor) {
+    // 插入到指定位置
+    let selRange = selObj?.getRangeAt(0)
+    selRange?.insertNode(document.createTextNode(insertContent))
+  } else {
+    if (elTemplate.value) {
+      let range = document.createRange()
+      range.setStart(elTemplate.value, 0)
+      range.insertNode(document.createTextNode(insertContent))
+    }
+  }
+}
+
+const insertSubSnippet = () => {
+  if (!selectedSubVar.value) return
+  let key = selectedSubVar.value
+  let insertContent = `{{{${key}}}}`
+  if (templateDataType.value === 'json:array') {
+    if (selectedVar.value?.example) {
+      let { example } = selectedVar.value
+      let varval
+      if (Array.isArray(example) && example.length) {
+        varval = _get(example[0], key)
+      } else if (typeof example === 'object') {
+        varval = _get(example, key)
+      }
+      if (varval && typeof varval === 'string') {
+        insertContent = `"${insertContent}"`
+      }
+    }
+  }
+
+  let selObj = window.getSelection()
+  /**
+   * 模板编辑框是否有选中的区域
+   */
+  let isVarsTplEditor = false
+  let pe = selObj?.anchorNode?.parentElement
+  while (pe) {
+    if (pe.classList.contains('ttv-wizard__sub-template')) {
+      isVarsTplEditor = true
+      break
+    }
+    pe = pe.parentElement
+  }
+  if (isVarsTplEditor) {
+    // 插入到指定位置
+    let selRange = selObj?.getRangeAt(0)
+    selRange?.insertNode(document.createTextNode(insertContent))
+  } else {
+    if (elSubTemplate.value) {
+      let range = document.createRange()
+      range.setStart(elSubTemplate.value, 0)
+      range.insertNode(document.createTextNode(insertContent))
+    }
+  }
+}
+
+const replaceTemplate = () => {
+  if (elTemplate.value) {
+    let insertContent = createSnippet()
+    elTemplate.value.innerText = insertContent
+  }
+}
+/**
+ * 创建测试数据模板
+ */
+const createSampleMold = () => {
+  let mold = wizard.createSampleMold(elTemplate.value?.innerText ?? '')
+  sample.value = JSON.stringify(mold)
+}
+
+const test = () => {
+  if (!elTemplate.value || !sample.value) return
+  wizard.template = elTemplate.value.innerText
+  try {
+    let sampleJson = JSON.parse(sample.value)
+    let outputResult = wizard.outputResult(sampleJson)
+    output.value =
+      wizard.templateDataType === 'text'
+        ? outputResult
+        : JSON.stringify(outputResult)
+  } catch (e: any) {
+    alert(e.message)
+  }
+}
+</script>

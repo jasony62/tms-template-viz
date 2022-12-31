@@ -1,153 +1,73 @@
 import Debug from 'debug'
 import * as Handlebars from 'handlebars'
-import _has from 'lodash.has'
+import _set from 'lodash.set'
+import _get from 'lodash.get'
 
-const log = Debug('tms-template-viz:wizard')
+const log = Debug('ttv:wizard')
 
-function convert(target: any, InputSample?: any): any {
-  if (Array.isArray(target)) {
-    return target.map((item) => {
-      return convert(item, InputSample)
-    })
-  } else if (target && typeof target === 'object') {
-    return Object.keys(target).reduce((tplObj, key) => {
-      tplObj[key] = convert(target[key], InputSample)
-      return tplObj
-    }, {})
-  } else {
-    if (InputSample) {
-      return _has(InputSample, target) ? `{{{${target}}}}` : target
-    } else {
-      return `{{{${target}}}}`
-    }
-  }
+export enum TEMPLATE_DATA_TYPE {
+  Text = 'text',
+  JsonArray = 'json:array',
 }
 
-export enum CONVERT_MODE {
-  Text = 'text_fill',
-  Fill = 'fill',
-  List = 'list',
+export enum TEMPLATE_SNIPPET_MODE {
+  Text = 'text',
+  List1 = 'list1',
+  List2 = 'list2',
 }
 
-class BuilderImpl {
-  mode: CONVERT_MODE
-  target
-  inputSample
+export type TemplateVar = {
+  name: string
+  title: string
+  example?: any
+}
 
-  constructor(target?: any) {
-    this.target = target
-  }
-  /**
-   * 通过模板提取target和mode
-   * @param template
-   */
-  setTemplate(template: string) {
-    let t
-    /**检查是否为列表转换*/
-    let found = template.match(
-      /\[\{\{#each\s(.+)\}\}\{\{#unless @first\}\},\{\{\/unless\}\}"\{{2,3}(.+?)\}{2,3}"\{\{\/each\}\}\]/
-    )
-    if (found) {
-      this.mode = CONVERT_MODE.List
-      let [, arrayName, itemName] = found
-      t = `["${arrayName}[*].${itemName}"]`
-    } else {
-      found = template.match(/^[.*]$|^\{.*\}$/)
-      if (found) {
-        this.mode = CONVERT_MODE.Fill
-        t = template.replaceAll(/\{{2,3}(.+?)\}{2,3}/g, '$1')
-      } else {
-        this.mode = CONVERT_MODE.Text
-        t = template
-      }
-    }
-
-    if (this.mode === CONVERT_MODE.Text) {
-      this.target = t
-    } else {
-      try {
-        this.target = JSON.parse(t)
-      } catch (e) {
-        // throw e
-      }
-    }
-
-    return this
-  }
-  setMode(val: CONVERT_MODE) {
-    this.mode = val
-    return this
-  }
-  setInputSample(val: any) {
-    this.inputSample = val
-    return this
-  }
-  build() {
-    const wizard = new Wizard(this.target, this.inputSample, this.mode)
-    return wizard
-  }
+export type WizardCreateOption = {
+  varsRootName?: string
+  vars?: TemplateVar[]
 }
 
 export class Wizard {
-  private _mode: CONVERT_MODE
-  private _target: any
-  private inputSample: any
-  private latestGenerated: string
+  private _template: any
+  private _templateDataType: TEMPLATE_DATA_TYPE
+  private _sample: any
+  private _varsRootName: string
+  private _templateVars
 
-  constructor(target: any, inputSample?: any, mode = CONVERT_MODE.Fill) {
-    this._target = target
-    this.inputSample = inputSample
-    if (typeof target === 'string') {
-      this._mode = CONVERT_MODE.Text
-    } else {
-      this._mode = mode
-    }
+  constructor(target?: any, sample?: any) {
+    this._template = target
+    this._sample = sample
+    this._templateDataType = TEMPLATE_DATA_TYPE.Text
   }
-
-  private fill(): string {
-    let mappings = convert(this._target, this.inputSample)
-    let template = JSON.stringify(mappings)
-    return template
+  get template() {
+    return this._template
   }
-
-  private list(): string {
-    let item = this._target[0]
-    let [arrayName, itemName] = item.split('[*].')
-    let template = `[{{#each ${arrayName}}}{{#unless @first}},{{/unless}}"{{{${itemName}}}}"{{/each}}]`
-    return template
+  set template(val) {
+    this._template = val
   }
-
-  private text(): string {
-    let template = this._target
-    return template
+  get templateDataType() {
+    return this._templateDataType
   }
-
-  get target() {
-    return this._target
+  set templateDataType(val) {
+    this._templateDataType = val
   }
-  get mode() {
-    return this._mode
+  get sample() {
+    return this._sample
   }
-  /**
-   * 生成并返回模板
-   * @returns
-   */
-  template(): string {
-    let tpl
-    switch (this._mode) {
-      case CONVERT_MODE.Fill:
-        tpl = this.fill()
-        break
-      case CONVERT_MODE.List:
-        tpl = this.list()
-        break
-      default:
-        tpl = this.text()
-    }
-
-    this.latestGenerated = tpl
-
-    return tpl
+  set sample(val: any) {
+    this._sample = val
+  }
+  get varsRootName() {
+    return this._varsRootName
+  }
+  set varsRootName(val: string) {
+    this._varsRootName = val
+  }
+  get templateVars() {
+    return this._templateVars
+  }
+  set templateVars(val) {
+    this._templateVars = val
   }
   /**
    * 根据模板和输入的数据，返回输出的数据
@@ -155,22 +75,94 @@ export class Wizard {
    * @returns
    */
   outputResult(input?: any): any {
-    if (!this.latestGenerated) {
-      this.template()
-    }
     // 解决运行时，根据执行位置再生成模板的情况
-    let latest = this.latestGenerated
+    let latest = this._template
     latest = latest.replaceAll('[*]', '[0]')
-    let template = Handlebars.compile(latest)
-    let result = template(input ?? this.inputSample)
-    if (this.mode === CONVERT_MODE.Text) {
+    let hb = Handlebars.compile(latest)
+    let result = hb(input ?? this.sample)
+
+    if (this._templateDataType === TEMPLATE_DATA_TYPE.Text) return result
+
+    try {
+      let json = JSON.parse(result)
+      return json
+    } catch (e) {
       return result
     }
-    let json = JSON.parse(result)
-    return json
+  }
+  /**
+   * 创建模板片段
+   * @param varname
+   * @param subTemplate
+   * @param mode
+   * @returns
+   */
+  createSnippet(
+    varname: string,
+    subTemplate: string,
+    mode?: TEMPLATE_SNIPPET_MODE
+  ) {
+    let snippet = ''
+    switch (mode) {
+      case TEMPLATE_SNIPPET_MODE.List1:
+        snippet = `{{#each ${varname}}}{{#unless @first}},{{/unless}}{{this}}{{/each}}`
+        if (this.templateDataType === 'json:array') snippet = `[${snippet}]`
+        break
+      case TEMPLATE_SNIPPET_MODE.List2:
+        snippet = `{{#each ${varname}}}{{#unless @first}},{{/unless}}${
+          subTemplate ?? '替换这里的内容'
+        }{{/each}}`
+        if (this.templateDataType === 'json:array') snippet = `[${snippet}]`
+        break
+      default:
+        snippet = `{{{${varname}}}}`
+    }
+
+    return snippet
   }
 
-  static Builder(target?: any) {
-    return new BuilderImpl(target)
+  createSampleMold(tpl?: string) {
+    let mold = { [this.varsRootName]: {} }
+    if (tpl) {
+      let re = new RegExp(
+        `(?<=\\{{2,3})${this.varsRootName}\\.\\w+(?=\\}{2,3})`,
+        'g'
+      )
+      Array.from(tpl.matchAll(re), (m) => {
+        let varpath = m[0]
+        let varobj = this.templateVars.get(varpath)
+        _set(mold, varpath, varobj?.example ?? '')
+      })
+      let re2 = new RegExp(
+        `(?<=\{{2}#each )${this.varsRootName}\\.\\w+(?=\\}{2,3})`,
+        'g'
+      )
+      Array.from(tpl.matchAll(re2), (m) => {
+        let varpath = m[0]
+        let varobj = this.templateVars.get(varpath)
+        _set(mold, varpath, varobj?.example ?? '')
+      })
+    }
+
+    return mold
+  }
+  /**
+   * 创建实例
+   * @param options
+   * @returns
+   */
+  static Create(options?: WizardCreateOption) {
+    options ??= {}
+    const { varsRootName, vars } = options
+
+    const mapOfVars = new Map()
+    if (Array.isArray(vars) && vars.length)
+      vars?.forEach((v) => mapOfVars.set(v.name, v))
+
+    const wizard = new Wizard()
+    wizard.varsRootName = varsRootName ?? ''
+    wizard.templateVars = mapOfVars
+
+    return wizard
   }
 }
