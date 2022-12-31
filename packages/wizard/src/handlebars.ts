@@ -2,30 +2,13 @@ import Debug from 'debug'
 import * as Handlebars from 'handlebars'
 import _set from 'lodash.set'
 import _get from 'lodash.get'
+import {
+  TEMPLATE_DATA_TYPE,
+  TEMPLATE_SNIPPET_MODE,
+  WizardCreateOption,
+} from './common'
 
 const log = Debug('ttv:wizard')
-
-export enum TEMPLATE_DATA_TYPE {
-  Text = 'text',
-  JsonArray = 'json:array',
-}
-
-export enum TEMPLATE_SNIPPET_MODE {
-  Text = 'text',
-  List1 = 'list1',
-  List2 = 'list2',
-}
-
-export type TemplateVar = {
-  name: string
-  title: string
-  example?: any
-}
-
-export type WizardCreateOption = {
-  varsRootName?: string
-  vars?: TemplateVar[]
-}
 
 export class Wizard {
   private _template: any
@@ -95,17 +78,27 @@ export class Wizard {
    * @param varname
    * @param subTemplate
    * @param mode
+   * @param sample
    * @returns
    */
   createSnippet(
     varname: string,
     subTemplate: string,
-    mode?: TEMPLATE_SNIPPET_MODE
+    mode?: TEMPLATE_SNIPPET_MODE,
+    sample?: any
   ) {
     let snippet = ''
     switch (mode) {
       case TEMPLATE_SNIPPET_MODE.List1:
-        snippet = `{{#each ${varname}}}{{#unless @first}},{{/unless}}{{this}}{{/each}}`
+        snippet = `{{#each ${varname}}}{{#unless @first}},{{/unless}}`
+        if (
+          Array.isArray(sample) &&
+          sample.length &&
+          typeof sample[0] === 'string'
+        )
+          snippet += `"{{this}}"`
+        else snippet += `{{this}}`
+        snippet += `{{/each}}`
         if (this.templateDataType === 'json:array') snippet = `[${snippet}]`
         break
       case TEMPLATE_SNIPPET_MODE.List2:
@@ -120,31 +113,54 @@ export class Wizard {
 
     return snippet
   }
-
+  /**
+   * 创建样例数据
+   * @param tpl
+   * @returns
+   */
   createSampleMold(tpl?: string) {
     let mold = { [this.varsRootName]: {} }
-    if (tpl) {
-      let re = new RegExp(
-        `(?<=\\{{2,3})${this.varsRootName}\\.\\w+(?=\\}{2,3})`,
-        'g'
-      )
-      Array.from(tpl.matchAll(re), (m) => {
+    if (!tpl) return
+
+    const res = [
+      `(?<=\\{{2,3})${this.varsRootName}\\.\\w+(?=\\}{2,3})`,
+      `(?<=\{{2}#each )${this.varsRootName}\\.\\w+(?=\\}{2,3})`,
+    ]
+    res.forEach((re) => {
+      Array.from(tpl.matchAll(new RegExp(re, 'g')), (m) => {
         let varpath = m[0]
         let varobj = this.templateVars.get(varpath)
-        _set(mold, varpath, varobj?.example ?? '')
+        if (!varobj || typeof varobj !== 'object') return
+        let { examples } = varobj
+        let varval =
+          Array.isArray(examples) && examples.length ? examples[0].data : ''
+        _set(mold, varpath, varval)
       })
-      let re2 = new RegExp(
-        `(?<=\{{2}#each )${this.varsRootName}\\.\\w+(?=\\}{2,3})`,
-        'g'
-      )
-      Array.from(tpl.matchAll(re2), (m) => {
-        let varpath = m[0]
-        let varobj = this.templateVars.get(varpath)
-        _set(mold, varpath, varobj?.example ?? '')
-      })
-    }
+    })
 
     return mold
+  }
+  /**
+   * 深度便利对象，返回所有key的数据
+   * @param example
+   * @returns
+   */
+  flattenExampleKeys(example: any) {
+    function walk(o: any, parentPath: string, result: string[]) {
+      for (let k in o) {
+        let v = o[k]
+        if (Array.isArray(v)) walk(v, parentPath + `[${k}]`, result)
+        else if (v && typeof v === 'object')
+          walk(v, parentPath + '.' + k, result)
+        else result.push(parentPath ? `.${k}` : k)
+      }
+    }
+
+    const result: string[] = []
+
+    walk(Array.isArray(example) ? example[0] : example, '', result)
+
+    return result
   }
   /**
    * 创建实例

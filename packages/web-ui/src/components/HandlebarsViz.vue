@@ -13,14 +13,16 @@
         <option value="json:array">JSON数组</option>
       </select>
     </div>
-    <div class="ttv-wizard__vars">
+    <div class="ttv-wizard__vars" v-if="vars?.length">
       <select v-model="selectedVar">
         <option :value="null">选择变量</option>
         <option v-for="v in vars" :value="v">{{ v.title }}</option>
       </select>
     </div>
-    <div class="ttv-wizard__sub-template"
-      v-if="[TEMPLATE_SNIPPET_MODE.List1, TEMPLATE_SNIPPET_MODE.List2].includes(mode)">
+    <div class="ttv-wizard__vars-custom" v-if="!vars?.length">
+      <input v-model="customVarName" placeholder="输入变量名称" />
+    </div>
+    <div class="ttv-wizard__sub-template" v-if="requireSubTemplate">
       <div>子模板</div>
       <div v-if="subVars.length">
         <select v-model="selectedSubVar">
@@ -28,15 +30,15 @@
           <option v-for="v in subVars" :value="v">{{ v }}</option>
         </select>
       </div>
-      <div class="ttv-wizard__actions">
-        <button @click="insertSubSnippet">插入变量</button>
+      <div class="ttv-wizard__actions" v-if="subVars.length">
+        <button @click="addSubSnippet" class="tvu-button">插入变量</button>
       </div>
       <div ref="elSubTemplate" class="ttv-wizard__editor" contenteditable="true"></div>
     </div>
     <div class="ttv-wizard__template">
       <div>模板</div>
       <div class="ttv-wizard__actions">
-        <button @click="insertSnippet" class="tvu-button">插入模板片段</button>
+        <button @click="addSnippet" class="tvu-button">插入模板片段</button>
         <button @click="replaceTemplate" class="tvu-button">替换模板</button>
       </div>
       <div ref="elTemplate" class="ttv-wizard__editor" contenteditable="true"></div>
@@ -76,6 +78,7 @@ const props = defineProps({
 })
 
 const selectedVar = ref<any>(null)
+const customVarName = ref<any>(null)
 const templateDataType = ref(TEMPLATE_DATA_TYPE.Text)
 const selectedSubVar = ref<string>('')
 const mode = ref(TEMPLATE_SNIPPET_MODE.Text)
@@ -100,30 +103,25 @@ watch(templateDataType, (nv) => {
     wizard.templateDataType = nv
 }, { immediate: true })
 
+const requireSubTemplate = computed(() => {
+  if (mode.value !== TEMPLATE_SNIPPET_MODE.List2) return false
+  return true
+})
+/**
+ * 子模板可用属性
+ */
 const subVars = computed(() => {
-  const example = selectedVar.value?.example
-  if (!example) return []
-  if (Array.isArray(example)) {
-    if (example.length === 0) return []
-  } else if (typeof example === 'object') {
-    if (Object.keys(example).length === 0) return []
+  const examples = selectedVar.value?.examples
+  if (!Array.isArray(examples) || examples.length === 0) return []
+
+  let exampleData = examples[0].data
+  if (Array.isArray(exampleData)) {
+    if (exampleData.length === 0) return []
+  } else if (typeof exampleData === 'object') {
+    if (Object.keys(exampleData).length === 0) return []
   } else return []
 
-  function walk(o: any, parentPath: string, result: string[]) {
-    for (let k in o) {
-      let v = o[k]
-      if (Array.isArray(v)) {
-        walk(v, parentPath + `[${k}]`, result)
-      } else if (v && typeof v === 'object') {
-        walk(v, parentPath + '.' + k, result)
-      } else {
-        result.push(parentPath ? `.${k}` : k)
-      }
-    }
-  }
-
-  const result: string[] = []
-  walk(Array.isArray(example) ? example[0] : example, '', result)
+  const result = wizard.flattenExampleKeys(exampleData)
 
   return result
 })
@@ -131,16 +129,31 @@ const subVars = computed(() => {
  * 创建模板片段
  */
 const createSnippet = () => {
-  if (!selectedVar.value) return ''
+  if (props.vars?.length) {
+    if (!selectedVar.value) return ''
 
-  const { name } = selectedVar.value
-  let subTpl = elSubTemplate.value?.innerText ?? '替换这里的内容'
-  let snippet = wizard.createSnippet(name, subTpl, mode.value)
+    const { name, examples } = selectedVar.value
+    let exampleData = (Array.isArray(examples) && examples.length) ? examples[0].data : undefined
+    let subTpl = elSubTemplate.value?.innerText ?? '替换这里的内容'
+    let snippet = wizard.createSnippet(name, subTpl, mode.value, exampleData)
 
-  return snippet
+    return snippet
+  } else if (customVarName.value) {
+    let name = customVarName.value
+    // 如果需要，添加变量根名称
+    if (!new RegExp(`^${props.varsRootName}\\.`).test(name)) name = props.varsRootName + '.' + name
+    let subTpl = elSubTemplate.value?.innerText ?? '替换这里的内容'
+    let snippet = wizard.createSnippet(name, subTpl, mode.value)
+
+    return snippet
+  }
+
+  return ''
 }
-
-const insertSnippet = () => {
+/**
+ * 在模板中插入片段
+ */
+const addSnippet = () => {
   let insertContent = createSnippet()
 
   let selObj = window.getSelection()
@@ -168,22 +181,27 @@ const insertSnippet = () => {
     }
   }
 }
-
-const insertSubSnippet = () => {
+/**
+ * 在子模板中插入片段
+ */
+const addSubSnippet = () => {
   if (!selectedSubVar.value) return
   let key = selectedSubVar.value
   let insertContent = `{{{${key}}}}`
   if (templateDataType.value === 'json:array') {
-    if (selectedVar.value?.example) {
-      let { example } = selectedVar.value
-      let varval
-      if (Array.isArray(example) && example.length) {
-        varval = _get(example[0], key)
-      } else if (typeof example === 'object') {
-        varval = _get(example, key)
-      }
-      if (varval && typeof varval === 'string') {
-        insertContent = `"${insertContent}"`
+    if (selectedVar.value?.examples) {
+      let { examples } = selectedVar.value
+      if (Array.isArray(examples) && examples.length) {
+        let exampleData = examples[0].data
+        let varval
+        if (Array.isArray(exampleData) && exampleData.length) {
+          varval = _get(exampleData[0], key)
+        } else if (typeof exampleData === 'object') {
+          varval = _get(exampleData, key)
+        }
+        if (varval && typeof varval === 'string') {
+          insertContent = `"${insertContent}"`
+        }
       }
     }
   }

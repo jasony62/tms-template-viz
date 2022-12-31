@@ -1,5 +1,6 @@
 .ttv-wizard {
   @apply w-full flex flex-col gap-2;
+  input,
   textarea,
   select {
     @apply box-border w-full p-2 border border-solid border-gray-200 rounded;
