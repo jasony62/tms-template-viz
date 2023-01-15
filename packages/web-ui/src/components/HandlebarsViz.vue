@@ -260,4 +260,16 @@ const test = () => {
     alert(e.message)
   }
 }
+/**
+ * 返回当前编辑的模板
+ */
+const editing = () => {
+  return elTemplate.value?.innerText
+}
+/**
+ * 允许外部使用
+ */
+defineExpose({
+  editing
+})
 </script>

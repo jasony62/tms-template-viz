@@ -1,12 +1,18 @@
 <template>
+  <div>
+    <button @click="getResult">获得模板</button>
+  </div>
   <div style="width:300px;">
-    <handlebars-viz :vars-root-name="varsRootName" :template-text="templateText" :vars="vars" />
+    <handlebars-viz ref="$ttv" :vars-root-name="varsRootName" :template-text="templateText" :vars="vars" />
   </div>
 </template>
 
 <script setup lang="ts">
 // @ts-ignore
 import { HandlebarsViz } from 'tms-template-viz'
+import { ref } from 'vue';
+
+const $ttv = ref<{ editing: () => any } | null>(null)
 
 const varsRootName = 'vars'
 
@@ -20,4 +26,9 @@ const vars = [
   { name: 'vars.arr4', title: '数组4（简单类型）', examples: [{ data: ['a', 'b', 'c'] }] },
   { name: 'vars.arr5', title: '数组5（对象类型）', examples: [{ data: [{ name: 'a' }, { name: 'b' }, { name: 'c' }] }] }
 ]
+
+const getResult = () => {
+  let result = $ttv.value?.editing()
+  alert('结果：' + result)
+}
 </script>
