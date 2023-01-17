@@ -14,10 +14,14 @@
       </select>
     </div>
     <div class="ttv-wizard__vars" v-if="vars?.length">
-      <select v-model="selectedVar">
+      <select v-model="selectedVar" @change="onChangeVar">
         <option :value="null">选择变量</option>
         <option v-for="v in vars" :value="v">{{ v.title }}</option>
       </select>
+      <div v-if="selectedVar?.examples?.length">
+        <div>样例数据</div>
+        <textarea v-model="example"></textarea>
+      </div>
     </div>
     <div class="ttv-wizard__vars-custom" v-if="!vars?.length">
       <input v-model="customVarName" placeholder="输入变量名称" />
@@ -82,6 +86,7 @@ const customVarName = ref<any>(null)
 const templateDataType = ref(TEMPLATE_DATA_TYPE.Text)
 const selectedSubVar = ref<string>('')
 const mode = ref(TEMPLATE_SNIPPET_MODE.Text)
+const example = ref('')
 const sample = ref('')
 const output = ref('')
 
@@ -125,6 +130,16 @@ const subVars = computed(() => {
 
   return result
 })
+/**
+ * 选择可用变量
+ * @param tplVar 
+ */
+const onChangeVar = () => {
+  example.value = ''
+  if (Array.isArray(selectedVar.value.examples) && selectedVar.value.examples.length) {
+    example.value = JSON.stringify(selectedVar.value.examples[0].data, null, 2)
+  }
+}
 /**
  * 创建模板片段
  */
