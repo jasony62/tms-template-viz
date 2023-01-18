@@ -5,6 +5,7 @@ export enum TEMPLATE_DATA_TYPE {
 
 export enum TEMPLATE_SNIPPET_MODE {
   Text = 'text',
+  Text2 = 'text2',
   List1 = 'list1',
   List2 = 'list2',
 }

@@ -147,12 +147,14 @@ export class Wizard {
    */
   flattenExampleKeys(example: any) {
     function walk(o: any, parentPath: string, result: string[]) {
+      const inArray = Array.isArray(o)
       for (let k in o) {
         let v = o[k]
-        if (Array.isArray(v)) walk(v, parentPath + `[${k}]`, result)
-        else if (v && typeof v === 'object')
-          walk(v, parentPath + '.' + k, result)
-        else result.push(parentPath ? `.${k}` : k)
+        if (v && typeof v === 'object') {
+          let kp = inArray ? `[${k}]` : k
+          let p = parentPath ? `${parentPath}.${kp}` : kp
+          walk(v, p, result)
+        } else result.push(parentPath ? `${parentPath}.${k}` : k)
       }
     }
 

@@ -26,6 +26,27 @@ const vars = [
   { name: 'vars.arr4', title: '数组4（简单类型）', examples: [{ data: ['a', 'b', 'c'] }] },
   { name: 'vars.arr5', title: '数组5（对象类型）', examples: [{ data: [{ name: 'a' }, { name: 'b' }, { name: 'c' }] }] },
   { name: 'vars.var6', title: '变量6' },
+  {
+    name: 'vars.userlist02', title: '测试数据02', "examples": [
+      {
+        "data": {
+          "code": 0,
+          "data": [
+            {
+              "_id": "63c7aba3818b1f15b73b2eac",
+              "extra": {
+                "billno": "abc123"
+              },
+              "username": "yangyue",
+              "mobile": 13370166318,
+              "qywx": "YG000887",
+              "TMW_CREATE_TIME": "2023-01-18 16:19:47"
+            }
+          ]
+        }
+      }
+    ]
+  },
 ]
 
 const getResult = () => {

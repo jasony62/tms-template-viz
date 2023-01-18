@@ -3,8 +3,9 @@
     <div class="ttv-wizard__mode">
       <select v-model="mode">
         <option value="text">插入单个变量</option>
+        <option value="text2">插入单个变量（任意数组索引）</option>
         <option value="list1">插入循环结构</option>
-        <option value="list2">插入循环结构（子模板）</option>
+        <option value="list2">插入循环结构（含子模板）</option>
       </select>
     </div>
     <div>
@@ -22,18 +23,18 @@
         <div>样例数据</div>
         <textarea v-model="example"></textarea>
       </div>
+      <div v-if="subVars.length">
+        <select v-model="selectedSubVar">
+          <option value="">选择子变量</option>
+          <option v-for="v in subVars" :value="v">{{ v }}</option>
+        </select>
+      </div>
     </div>
     <div class="ttv-wizard__vars-custom" v-if="!vars?.length">
       <input v-model="customVarName" placeholder="输入变量名称" />
     </div>
     <div class="ttv-wizard__sub-template" v-if="requireSubTemplate">
       <div>子模板</div>
-      <div v-if="subVars.length">
-        <select v-model="selectedSubVar">
-          <option value="">选择变量</option>
-          <option v-for="v in subVars" :value="v">{{ v }}</option>
-        </select>
-      </div>
       <div class="ttv-wizard__actions" v-if="subVars.length">
         <button @click="addSubSnippet" class="tvu-button">插入变量</button>
       </div>
@@ -108,10 +109,9 @@ watch(templateDataType, (nv) => {
     wizard.templateDataType = nv
 }, { immediate: true })
 
-const requireSubTemplate = computed(() => {
-  if (mode.value !== TEMPLATE_SNIPPET_MODE.List2) return false
-  return true
-})
+const requireSubTemplate = computed(() =>
+  [TEMPLATE_SNIPPET_MODE.List2].includes(mode.value)
+)
 /**
  * 子模板可用属性
  */
@@ -148,9 +148,12 @@ const createSnippet = () => {
     if (!selectedVar.value) return ''
 
     const { name, examples } = selectedVar.value
+    const childName = selectedSubVar.value
     let exampleData = (Array.isArray(examples) && examples.length) ? examples[0].data : undefined
     let subTpl = elSubTemplate.value?.innerText ?? '替换这里的内容'
-    let snippet = wizard.createSnippet(name, subTpl, mode.value, exampleData)
+    let varname = childName ? `${name}.${childName}` : name
+    if (mode.value === TEMPLATE_SNIPPET_MODE.Text2) varname = varname.replace(/\[\d+\]/g, '[*]')
+    let snippet = wizard.createSnippet(varname, subTpl, mode.value, exampleData)
 
     return snippet
   } else if (customVarName.value) {
