@@ -1,6 +1,9 @@
 .ttv-wizard {
   @apply w-full flex flex-col gap-2;
-  input,
+  .ttv-wizard-divider {
+    @apply text-center text-gray-600 bg-gray-200 py-2;
+  }
+  input[type='text'],
   textarea,
   select {
     @apply box-border w-full p-2 border border-solid border-gray-200 rounded;
@@ -8,8 +11,8 @@
   textarea {
     min-height: 10rem;
   }
-  .ttv-wizard__vars,
-  .ttv-wizard__sub-template,
+  .ttv-wizard__vars-select,
+  .ttv-wizard__vars-custom,
   .ttv-wizard__template,
   .ttv-wizard__sample,
   .ttv-wizard__output {

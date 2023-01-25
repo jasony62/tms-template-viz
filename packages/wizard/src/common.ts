@@ -1,13 +1,6 @@
 export enum TEMPLATE_DATA_TYPE {
   Text = 'text',
-  JsonArray = 'json:array',
-}
-
-export enum TEMPLATE_SNIPPET_MODE {
-  Text = 'text',
-  Text2 = 'text2',
-  List1 = 'list1',
-  List2 = 'list2',
+  Json = 'json',
 }
 
 export type TemplateVarExample = {
@@ -18,6 +11,7 @@ export type TemplateVarExample = {
 export type TemplateVar = {
   name: string
   title: string
+  type: string
   examples?: TemplateVarExample[]
 }
 

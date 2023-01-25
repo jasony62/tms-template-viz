@@ -1,6 +1,6 @@
 {
   "name": "tms-template-wizard",
-  "version": "0.0.7",
+  "version": "0.0.8",
   "description": "生成模板文档的工具包，支持：handlebars模板。",
   "main": "./dist/esm/index.js",
   "exports": {
