@@ -19,8 +19,8 @@
         <textarea v-model="example"></textarea>
       </div>
       <div v-if="subVars.length">
-        <select v-model="subVar">
-          <option :value="null">选择变量</option>
+        <select v-model="subVar" @change="onChangeSubVar">
+          <option :value="null">选择子变量</option>
           <option v-for="tv in subVars" :value="tv">{{ tv.name }}</option>
         </select>
       </div>
@@ -29,16 +29,16 @@
       <div>
         <input type="text" v-model="customVarName" placeholder="输入模板变量名称" />
       </div>
-      <div>
-        <select v-model="customVarType">
-          <option value="">选择变量类型</option>
-          <option value="array">数组</option>
-          <option value="object">对象</option>
-          <option value="string">字符串</option>
-          <option value="number">数字</option>
-          <option value="boolean">布尔</option>
-        </select>
-      </div>
+    </div>
+    <div class="ttv-wizard__vartype">
+      <select v-model="customVarType">
+        <option value="">选择变量类型</option>
+        <option value="array">数组</option>
+        <option value="object">对象</option>
+        <option value="string">字符串</option>
+        <option value="number">数字</option>
+        <option value="boolean">布尔</option>
+      </select>
     </div>
     <div class="ttv-wizard-divider">模板内容</div>
     <div class="ttv-wizard__template">
@@ -155,15 +155,31 @@ const subVars = computed<TemplateVar[]>(() => {
   return result
 })
 /**
- * 选择可用变量
+ * 选择变量
  * @param tplVar 
  */
 const onChangeVar = () => {
   example.value = ''
+  customVarType.value = 'string'
   if (rootVar.value) {
     if (Array.isArray(rootVar.value.examples) && rootVar.value.examples.length) {
+      /**
+       * 使用第1个样例数据
+       */
       example.value = JSON.stringify(rootVar.value.examples[0].data, null, 2)
+      customVarType.value = typeof rootVar.value.examples[0].data
     }
+  }
+}
+/**
+ * 选择子变量
+ * @param tplVar 
+ */
+const onChangeSubVar = () => {
+  if (subVar.value?.type) {
+    customVarType.value = subVar.value.type
+  } else {
+    customVarType.value = 'string'
   }
 }
 /**
@@ -190,10 +206,15 @@ const createSnippet = () => {
         Array.from(matched).forEach(m => varName = varName.replace(`${m[0]}.[0].`, ''))
       }
     }
-
-    let varType = subVar.value?.type || rootVar.value.type
+    /**
+     * 允许用户指定变量的类型
+     */
+    let varType = customVarType.value || subVar.value?.type || rootVar.value.type
     snippet = wizard.createSnippet(varName, varType, useAsteriskAsArrayIndex.value)
   } else if (customVarName.value && customVarType.value) {
+    /**
+     * 用户自定义变量
+     */
     let name = customVarName.value
     let type = customVarType.value
     // 如果需要，添加变量根名称
