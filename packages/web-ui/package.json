@@ -1,6 +1,6 @@
 {
   "name": "tms-template-viz",
-  "version": "0.0.9",
+  "version": "0.0.10",
   "description": "生成模板文档的可视化工具包，支持：handlebars模板。",
   "type": "module",
   "files": [
@@ -24,8 +24,7 @@
   "dependencies": {
     "handlebars": "^4.7.7",
     "lodash.get": "^4.4.2",
-    "tms-template-wizard": "workspace:*",
-    "vue": "^3.2.37"
+    "tms-template-wizard": "workspace:*"
   },
   "devDependencies": {
     "@types/jest": "^29.1.2",
@@ -41,6 +40,7 @@
     "ts-jest": "^29.0.3",
     "typescript": "^4.6.4",
     "vite": "^3.1.0",
+    "vue": "^3.2.37",
     "vue-tsc": "^1.0.5"
   }
 }

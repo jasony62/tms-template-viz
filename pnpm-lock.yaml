@@ -43,7 +43,6 @@ importers:
       handlebars: 4.7.7
       lodash.get: 4.4.2
       tms-template-wizard: link:../wizard
-      vue: 3.2.40
     devDependencies:
       '@types/jest': 29.1.2
       '@types/lodash.get': 4.4.7
@@ -58,6 +57,7 @@ importers:
       ts-jest: 29.0.3_2gcdg7c5hzdfd67o3khlosdlhu
       typescript: 4.8.4
       vite: 3.1.7_sass@1.55.0
+      vue: 3.2.40
       vue-tsc: 1.0.5_typescript@4.8.4
 
   packages/wizard:
@@ -856,7 +856,7 @@ packages:
       vite: ^3.0.0
       vue: ^3.2.25
     dependencies:
-      vite: 3.1.7
+      vite: 3.1.7_sass@1.55.0
       vue: 3.2.40
     dev: true
 
