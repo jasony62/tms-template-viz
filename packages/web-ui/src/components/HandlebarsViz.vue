@@ -85,6 +85,9 @@ import { Wizard, TEMPLATE_DATA_TYPE } from 'tms-template-wizard'
 import type { TemplateVar, WizardCreateOption } from 'tms-template-wizard'
 import './HandlebarsViz.scss'
 import _get from 'lodash.get'
+import Debug from 'debug'
+
+const debug = Debug('tms-template-viz:web-ui')
 
 const canGetVarMode = ref<Boolean>(false)
 const getVarMode = ref<String>('custom')
@@ -109,6 +112,15 @@ const props = defineProps({
   varsRootName: { type: String, required: true },
   templateText: { type: String },
   vars: { type: Array<TemplateVar> },
+  /**
+   * 接收处理内部消息提醒的方法
+   */
+  onMessage: {
+    type: Function,
+    default: (msg: string) => {
+      alert(msg)
+    },
+  },
 })
 /**
  * 添加根变量的类型信息
@@ -188,38 +200,48 @@ const onChangeSubVar = () => {
 const createSnippet = () => {
   let snippet = ''
 
-  if (rootVars.value?.length) {
-    if (!rootVar.value) return snippet
+  switch (getVarMode.value) {
+    case 'select':
+      if (rootVars.value?.length) {
+        if (!rootVar.value) return snippet
 
-    const { name } = rootVar.value
-    const subName = subVar.value?.name
-    let varName = subName ? `${name}.${subName}` : name
-    /**
-     * 变量的名称改为上下文中的名称
-     */
-    let tplText = elTemplate.value?.innerText
-    if (tplText) {
-      let selObj = window.getSelection()
-      if (selObj && selObj.anchorOffset) {
-        let beforeTplStr = tplText.substring(0, selObj.anchorOffset)
-        let matched = beforeTplStr.matchAll(/(?<=\{{2}#each )[\w|\.]+(?=\}{2,3})/g)
-        Array.from(matched).forEach(m => varName = varName.replace(`${m[0]}.[0].`, ''))
+        debug('使用用户选择的模板变量名称生成模板片段')
+
+        const { name } = rootVar.value
+        const subName = subVar.value?.name
+        let varName = subName ? `${name}.${subName}` : name
+        /**
+         * 变量的名称改为上下文中的名称
+         */
+        let tplText = elTemplate.value?.innerText
+        if (tplText) {
+          let selObj = window.getSelection()
+          if (selObj && selObj.anchorOffset) {
+            let beforeTplStr = tplText.substring(0, selObj.anchorOffset)
+            let matched = beforeTplStr.matchAll(/(?<=\{{2}#each )[\w|\.]+(?=\}{2,3})/g)
+            Array.from(matched).forEach(m => varName = varName.replace(`${m[0]}.[0].`, ''))
+          }
+        }
+        /**
+         * 允许用户指定变量的类型
+         */
+        let varType = customVarType.value || subVar.value?.type || rootVar.value.type
+        snippet = wizard.createSnippet(varName, varType, useAsteriskAsArrayIndex.value)
       }
-    }
-    /**
-     * 允许用户指定变量的类型
-     */
-    let varType = customVarType.value || subVar.value?.type || rootVar.value.type
-    snippet = wizard.createSnippet(varName, varType, useAsteriskAsArrayIndex.value)
-  } else if (customVarName.value && customVarType.value) {
-    /**
-     * 用户自定义变量
-     */
-    let name = customVarName.value
-    let type = customVarType.value
-    // 如果需要，添加变量根名称
-    // if (!new RegExp(`^${props.varsRootName}\\.`).test(name)) name = props.varsRootName + '.' + name
-    snippet = wizard.createSnippet(name, type, useAsteriskAsArrayIndex.value)
+      break
+    case 'custom':
+      if (customVarName.value && customVarType.value) {
+        debug('使用用户自定义的模板变量名称生成模板片段')
+        /**
+         * 用户自定义变量
+         */
+        let name = customVarName.value
+        let type = customVarType.value
+        // 如果需要，添加变量根名称
+        // if (!new RegExp(`^${props.varsRootName}\\.`).test(name)) name = props.varsRootName + '.' + name
+        snippet = wizard.createSnippet(name, type, useAsteriskAsArrayIndex.value)
+      }
+      break
   }
 
   return snippet
@@ -229,6 +251,11 @@ const createSnippet = () => {
  */
 const addSnippet = () => {
   let insertContent = createSnippet()
+  if (!insertContent) {
+    props.onMessage('生成的模板片段为空，无法执行插入操作！')
+    return
+  }
+  debug('生成插入片段：', insertContent)
   let selObj = window.getSelection()
   /**
    * 模板编辑框是否有选中的区域
@@ -243,15 +270,14 @@ const addSnippet = () => {
     pe = pe.parentElement
   }
   if (isVarsTplEditor) {
-    /**
-     * 在模板中执行插入操作
-     */
+    debug('在模板中选中区域执行插入操作')
     let selRange = selObj?.getRangeAt(0)
     if (selRange) {
       selRange.deleteContents()
       selRange.insertNode(document.createTextNode(insertContent))
     }
   } else {
+    debug('在模板中起始位置执行插入操作')
     if (elTemplate.value) {
       let range = document.createRange()
       range.setStart(elTemplate.value, 0)
@@ -260,7 +286,7 @@ const addSnippet = () => {
   }
 }
 /**
- * 
+ * 模板代码片段替换整个模板
  */
 const replaceTemplate = () => {
   if (elTemplate.value) {
